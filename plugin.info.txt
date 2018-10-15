@@ -1,0 +1,7 @@
+base   taggingsync
+author Michael Große
+email  dokuwiki@cosmocode.de
+date   2018-10-12
+name   taggingsync plugin
+desc   Push changes from a primary wiki to a client wiki on the same server based on tags in the primary wiki
+url    https://dokuwiki.org/plugin:taggingsync
