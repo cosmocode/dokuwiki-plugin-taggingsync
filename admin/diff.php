@@ -53,15 +53,12 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
     public function handle()
     {
         global $conf;
+
+        /** @var helper_plugin_taggingsync $hlp */
+        $hlp = plugin_load('helper', 'taggingsync');
+        if (!$hlp->checkRequirements(false)) return;
+
         $clientDataPath = $this->getConf('client_wiki_directory');
-        if (empty($clientDataPath)) {
-            msg('Please configure clientpath in configuration!', -1);
-            return;
-        }
-
-        // FIXME: check writable!
-        // FIXME: check tagging plugin installed!
-
         $clientDataPath = rtrim($clientDataPath, '/');
         $clientPagesPath = $clientDataPath . '/pages';
         $now = microtime(true);
@@ -156,6 +153,11 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
     public function html()
     {
         ptln('<h1>' . $this->getLang('menu_diff') . '</h1>');
+
+        /** @var helper_plugin_taggingsync $hlp */
+        $hlp = plugin_load('helper', 'taggingsync');
+        if (!$hlp->checkRequirements(true)) return;
+
         echo '<table>';
         echo '<tr>';
         echo '<th>' . $this->getLang('header: page') . '</th>';

@@ -49,9 +49,13 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         return $this->getLang('menu') . ' ' . $this->getLang('menu_transfer');
     }
 
+    /** @inheritdoc */
     public function handle()
     {
-        // FIXME: add warning on tagging missing
+        /** @var helper_plugin_taggingsync $hlp */
+        $hlp = plugin_load('helper', 'taggingsync');
+        if(!$hlp->checkRequirements(false)) return;
+
         global $INPUT;
         if ($INPUT->has('tag')) {
             $tag = substr($INPUT->str('tag'), 1); // remove leading underscore
@@ -205,15 +209,10 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         global $INPUT;
         echo '<h1>' . $this->getLang('menu_transfer') . '</h1>';
         // FIXME 2018-10-12 Add intro text here!
-        if (trim($this->getConf('client_wiki_directory')) === '') {
-            msg('Please add server directory path to the client wiki\'s data directory in config!', -1);
-            return;
-        }
 
-        if (trim($this->getConf('client_log_namespace')) === '') {
-            msg('Please add the namespace in the client wiki where the logs should be written! (=> config)', -1);
-            return;
-        }
+        /** @var helper_plugin_taggingsync $hlp */
+        $hlp = plugin_load('helper', 'taggingsync');
+        if(!$hlp->checkRequirements(true)) return;
 
         $this->showTagSelector();
         if (!$INPUT->has('tag')) {
