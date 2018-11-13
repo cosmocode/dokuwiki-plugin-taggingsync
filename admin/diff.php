@@ -11,7 +11,7 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
 
     protected $primaryPages;
     protected $clientPages;
-    protected $combinedPages;
+    protected $combinedPages = [];
 
     /**
      * @return int sort number in admin menu
@@ -38,7 +38,13 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
      */
     public function getMenuText($language)
     {
-        return 'taggingsync: ' . $this->getLang('menu_diff');
+        return $this->getLang('menu') . ' ' . $this->getLang('menu_diff');
+    }
+
+    /** @inheritdoc */
+    public function getMenuIcon()
+    {
+        return __DIR__ . '/../diff.svg';
     }
 
     /**
@@ -91,7 +97,7 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
     /**
      * Add information about tags, title and media files to the $pages
      *
-     * @param array[]  $pages   pageid as key, pagedata as value
+     * @param array[] $pages pageid as key, pagedata as value
      * @param string[] $allTags pageid as key, tags of that page as value (comma separated string)
      *
      * @return array[]
@@ -111,7 +117,7 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
     /**
      * Recursively find all pages in the given directory and collect basic data
      *
-     * @param string $dir       the directory on the filesystem
+     * @param string $dir the directory on the filesystem
      * @param string $namespace the namespace associated with this directory
      *
      * @return array[] pageid as key, value contains mtime and filename
@@ -149,7 +155,7 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
      */
     public function html()
     {
-        ptln('<h1>' . $this->getLang('menu') . 'diffs</h1>');
+        ptln('<h1>' . $this->getLang('menu_diff') . '</h1>');
         echo '<table>';
         echo '<tr>';
         echo '<th>' . $this->getLang('header: page') . '</th>';
@@ -229,7 +235,7 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
      * This method can currently be used both for the primary and the client wiki
      *
      *
-     * @param string  $pid
+     * @param string $pid
      * @param array[] $pages an array of all available pages for this wiki, pageid as key, array with mtime key as value
      */
     protected function printLastModCell($pid, $pages)

@@ -31,6 +31,12 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         return true;
     }
 
+    /** @inheritdoc */
+    public function getMenuIcon()
+    {
+        return __DIR__ . '/../sync.svg';
+    }
+
     /**
      * Return the text that is displayed at the main admin menu
      *
@@ -40,7 +46,7 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
      */
     public function getMenuText($language)
     {
-        return 'taggingsync: ' . $this->getLang('menu_transfer');
+        return $this->getLang('menu') . ' ' . $this->getLang('menu_transfer');
     }
 
     public function handle()

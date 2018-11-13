@@ -6,8 +6,9 @@
  */
 
 // menu entry for admin plugins
-$lang['menu_diff'] = 'Show differences between this wiki and the client wiki';
-$lang['menu_transfer'] = 'Transfer tagged changes to client wiki';
+$lang['menu'] = 'TaggingSync:';
+$lang['menu_diff'] = 'Wiki Differences';
+$lang['menu_transfer'] = 'Transfer Tagged Changes';
 
 // custom language strings for the plugin
 $lang['header: page'] = 'Page';
