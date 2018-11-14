@@ -10,10 +10,24 @@ use dokuwiki\Form\Form;
  */
 class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
 {
+    // just for making things easier to read
+    const LOCAL = true;
+    const REMOTE = false;
+    const PAGE = true;
+    const MEDIA = false;
+
 
     protected $taggedPages;
     protected $transferedMedia;
     protected $now;
+
+    /** @var helper_plugin_taggingsync */
+    protected $hlp;
+
+    public function __construct()
+    {
+        $this->hlp = plugin_load('helper', 'taggingsync');
+    }
 
     /**
      * @return int sort number in admin menu
@@ -52,9 +66,7 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
     /** @inheritdoc */
     public function handle()
     {
-        /** @var helper_plugin_taggingsync $hlp */
-        $hlp = plugin_load('helper', 'taggingsync');
-        if(!$hlp->checkRequirements(false)) return;
+        if (!$this->hlp->checkRequirements(false)) return;
 
         global $INPUT;
         if ($INPUT->has('tag')) {
@@ -82,32 +94,63 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
     }
 
     /**
+     * Creates a list of files that are tagged witht he current tag and differ from the client wiki
+     *
+     * @return array
+     */
+    protected function previewTransferList()
+    {
+        $transfer = [];
+
+        foreach (array_keys($this->taggedPages) as $pid) {
+            if (!$this->hlp->filesEqual(wikiFN($pid), $this->hlp->clientFileForID($pid))) {
+                $transfer['p' . $pid] = ['id' => $pid, 'type' => 'page'];
+            }
+
+            $pageMedia = p_get_metadata($pid, 'relation')['media'];
+            if (null === $pageMedia) continue;
+
+            foreach (array_keys($pageMedia) as $mid) {
+                if (!$this->hlp->filesEqual(mediaFN($pid), $this->hlp->clientFileForID($pid, 'media'))) {
+                    $transfer['p' . $mid] = ['id' => $mid, 'type' => 'media'];
+                }
+            }
+        }
+
+        return $transfer;
+    }
+
+
+    /**
      * Transfer a single page and its associated media to the client wiki
      *
-     * @param string $pid           the page id
+     * @param string $pid the page id
      * @param string $clientDataDir the path of the client wiki's data directory
-     * @param string $summary       summary of the transfer
+     * @param string $summary summary of the transfer
      */
     protected function transferSinglePage($pid, $clientDataDir, $summary)
     {
-        $pageAsPath = str_replace(':', '/', $pid);
-        $pagePathClient = $clientDataDir . '/pages/' . $pageAsPath . '.txt';
-        io_makeFileDir($pagePathClient);
-        copy(wikiFN($pid), $pagePathClient);
-        // FIXME 2018-10-19: This should be a proper revision stating that the page has been transfered to the client
-        touch(wikiFN($pid), $this->now);
+        $pagePathClient = $this->hlp->clientFileForID($pid, 'page');
+        $metaPathClient = $this->hlp->clientFileForID($pid, 'meta');
+        $changelogPathClient = $this->hlp->clientFileForID($pid, 'changelog');
 
-        $metaPathClient = $clientDataDir . '/meta/' . $pageAsPath . '.meta';
-        io_makeFileDir($metaPathClient);
-        copy(metaFN($pid, '.meta'), $metaPathClient);
+        // copy page if it differs
+        if (!$this->hlp->filesEqual(wikiFN($pid), $pagePathClient)) {
+            io_makeFileDir($pagePathClient);
+            copy(wikiFN($pid), $pagePathClient);
+            touch(wikiFN($pid), $this->now);
 
-        $changelogPathClient = $clientDataDir . '/meta/' . $pageAsPath . '.changes';
-        $changelogSummary = $this->getLang('changelog prefix') . $summary;
-        $changelog = $this->now . "\t0.0.0.0\tE\t$pid\t \t$changelogSummary\t \n";
-        file_put_contents($changelogPathClient, $changelog);
+            io_makeFileDir($metaPathClient);
+            copy(metaFN($pid, '.meta'), $metaPathClient);
 
-        $this->writeLogLine($pid, $clientDataDir, $summary, $this->getLang('log: page'));
+            $changelogSummary = $this->getLang('changelog prefix') . $summary;
+            $changelog = $this->now . "\t0.0.0.0\tE\t$pid\t \t$changelogSummary\t \n";
+            file_put_contents($changelogPathClient, $changelog);
 
+            $this->writeLogLine($pid, $clientDataDir, $summary, $this->getLang('log: page'));
+        }
+
+        // check media file dependencies
         $pageMedia = p_get_metadata($pid, 'relation')['media'];
         if (null !== $pageMedia) {
             $this->transferMedia(array_keys($pageMedia), $clientDataDir, $summary);
@@ -117,25 +160,28 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
     /**
      * Transfer the provided media files to the client wiki
      *
-     * @param string[] $pageMedia     array of media ids
-     * @param string   $clientDataDir the path of the client wiki's data directory
-     * @param string   $summary       summary of the transfer
+     * @param string[] $pageMedia array of media ids
+     * @param string $clientDataDir the path of the client wiki's data directory
+     * @param string $summary summary of the transfer
      */
     protected function transferMedia($pageMedia, $clientDataDir, $summary)
     {
         foreach ($pageMedia as $mediaID) {
             if ($this->transferedMedia[$mediaID]) {
-                $this->writeLogLine($mediaID, $clientDataDir, $summary, $this->getLang('log: media skipped'));
                 continue;
             }
             $this->transferedMedia[$mediaID] = true;
 
-            $mediaAsPath = str_replace(':', '/', $mediaID);
-            $mediaPathClient = $clientDataDir . '/media/' . $mediaAsPath;
+            $mediaPathClient = $this->hlp->clientFileForID($mediaID, 'media');
+            $changelogPathClient = $this->hlp->clientFileForID($mediaID, 'mediachangelog');
+
+            if ($this->hlp->filesEqual(mediaFN($mediaID), $mediaPathClient)) {
+                continue; // files are the same, skip copying
+            }
+
             io_makeFileDir($mediaPathClient);
             copy(mediaFN($mediaID), $mediaPathClient);
 
-            $changelogPathClient = $clientDataDir . '/media_meta/' . $mediaAsPath . '.changes';
             io_makeFileDir($changelogPathClient);
             $changelogSummary = $this->getLang('changelog prefix') . $summary;
             $changelog = $this->now . "\t0.0.0.0\tE\t$mediaID\t \t$changelogSummary\t \n";
@@ -148,7 +194,7 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
     /**
      * Write the initial lines of this transfer's log at the client wiki
      *
-     * @param string $logFN   Filename of the log page at the client wiki
+     * @param string $logFN Filename of the log page at the client wiki
      * @param string $summary summary of the transfer
      */
     protected function writeLogHeader($logFN, $summary)
@@ -162,9 +208,9 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
     /**
      * Write a line in the transfer log
      *
-     * @param string $id                  the transfered file (pageid or mediaid)
-     * @param string $clientDataDir       the path of the client wiki's data directory
-     * @param string $summary             summary of the transfer
+     * @param string $id the transfered file (pageid or mediaid)
+     * @param string $clientDataDir the path of the client wiki's data directory
+     * @param string $summary summary of the transfer
      * @param string $localizedLogMessage the log message, should have a "%s" for the id
      */
     protected function writeLogLine($id, $clientDataDir, $summary, $localizedLogMessage)
@@ -204,18 +250,18 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         $this->taggedPages = $tagging->findItems(['tag' => $tag], 'pid');
     }
 
+    /** @inheritdoc */
     public function html()
     {
         global $INPUT;
         echo '<h1>' . $this->getLang('menu_transfer') . '</h1>';
         // FIXME 2018-10-12 Add intro text here!
 
-        /** @var helper_plugin_taggingsync $hlp */
-        $hlp = plugin_load('helper', 'taggingsync');
-        if(!$hlp->checkRequirements(true)) return;
+        if (!$this->hlp->checkRequirements(true)) return;
 
         $this->showTagSelector();
-        if (!$INPUT->has('tag')) {
+
+        if ($INPUT->str('tag') === '') {
             return;
         }
         $tag = $INPUT->str('tag');
@@ -229,23 +275,37 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
      */
     protected function showTransferForm($tag)
     {
-        echo '<ul>';
-        foreach ($this->taggedPages as $pageid => $cnt) {
-            echo '<li>' . html_wikilink($pageid) . '</li>';
+        // prepare list
+        $preview = $this->previewTransferList();
+        $count = count($preview);
+        if ($count) {
+            $list = '<ul>';
+            foreach ($preview as $item) {
+                if ($item['type'] === 'page') {
+                    $list .= '<li>' . html_wikilink($item['id']) . '</li>';
+                } else {
+                    $list .= '<li>' . $item['id'] . '</li>';
+                }
+            }
+            $list .= '</ul>';
+        } else {
+            $list = '<p>' . $this->getLang('label: no file') . '</p>';
         }
-        echo '</ul>';
-        // FIXME: also show associated media!
+
 
         global $ID;
         $form = new Form([
             'action' => wl($ID, ['do' => 'admin', 'page' => 'taggingsync_transfer'], false, '&'),
+            'class' => 'taggingsync_transfer'
         ]);
         $form->setHiddenField('tag', $tag);
-        $summaryInput = $form->addTextInput('summary', 'Transfer notice for changelog');
-        $summaryInput->attr('required', '1');
-        // FIXME 2018-10-12: make input longer
+        $form->addFieldsetOpen(sprintf($this->getLang('label: tagged with'), hsc($tag)));
+        $form->addHTML($list);
 
-        $form->addButton('execute_transfer', 'Transfer files now');
+        if ($count) {
+            $form->addTextInput('summary', $this->getLang('label: summary'))->attr('required', '1');
+            $form->addButton('execute_transfer', 'Transfer files now');
+        }
         echo $form->toHTML();
     }
 

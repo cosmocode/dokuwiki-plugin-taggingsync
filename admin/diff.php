@@ -102,7 +102,7 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
     protected function hydratePrimaryPages($pages, $allTags)
     {
         foreach ($pages as $pid => &$pageData) {
-            $pageData['tags'] = !empty($allTags[$pid]) ? explode(',', $allTags[$pid]) : [];
+            $pageData['tags'] = !empty($allTags[$pid]) ? $allTags[$pid] : [];
             $pageData['title'] = p_get_metadata(cleanID($pid), 'title');
 
             $pageMedia = p_get_metadata(cleanID($pid), 'relation')['media'];
