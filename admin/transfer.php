@@ -255,7 +255,7 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
     {
         global $INPUT;
         echo '<h1>' . $this->getLang('menu_transfer') . '</h1>';
-        // FIXME 2018-10-12 Add intro text here!
+        echo $this->locale_xhtml('transfer');
 
         if (!$this->hlp->checkRequirements(true)) return;
 

@@ -1,0 +1,3 @@
+Here you can transfer all changed pages tagged with a selected tag to the client wiki. Media files used on the tagged pages will also be synced to to the client wiki.
+
+Select the tag to see a preview of affected files, then fill out the change summary and start the transfer. Depending on the amount of affected files, the transfer can take a while.
