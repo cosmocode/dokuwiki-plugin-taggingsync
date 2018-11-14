@@ -26,6 +26,8 @@ $lang['label: summary'] = 'Changlog Summary:';
 $lang['label: tagged with'] = 'Files tagged with %s';
 $lang['label: no file'] = 'No files differ for this tag';
 
+$lang['msg: transfer done'] = 'Transfer complete';
+
 $lang['log: headline'] = 'Log of page update "%s"';
 $lang['log: date'] = 'Date of export: %s';
 $lang['log: page'] = 'The page [[%s]] was replaced by a new Version. Its meta information and changelog was also replaced.';

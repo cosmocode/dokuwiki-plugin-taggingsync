@@ -90,7 +90,7 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
             $this->transferSinglePage($pid, $clientDataDir, $INPUT->str('summary'));
         }
 
-        // FIXME 2018-10-18: show some kind of success message!
+        msg($this->getLang('msg: transfer done'), 1);
     }
 
     /**
