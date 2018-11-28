@@ -1,4 +1,4 @@
-jQuery(function() {
+jQuery(function () {
 
     const diffRepo = {};
 
@@ -16,7 +16,7 @@ jQuery(function() {
             call: 'taggingsync_getdiff',
             pid: pid,
             clientPageFN: clientPageFN,
-        }).done(function(data){
+        }).done(function (data) {
             diffRepo[pid] = data;
             showDiff(pid);
         });
@@ -32,5 +32,27 @@ jQuery(function() {
         });
     }
 
+    function editTags() {
+        const $elem = jQuery(this);
+        let tags = $elem.text();
+        const pid = $elem.data('page');
+        tags = window.prompt('Edit Tags', tags);
+        if (tags === null) return;
+
+        jQuery.post(
+            DOKU_BASE + 'lib/exe/ajax.php?call=plugin_tagging_save',
+            {
+                tagging: {
+                    id: pid,
+                    tags: tags
+                }
+            },
+            function () {
+                $elem.text(tags);
+            }
+        );
+    }
+
     jQuery('.taggingsync_diff').click(requestDiffHandler);
+    jQuery('.taggingsync_tags').click(editTags);
 });

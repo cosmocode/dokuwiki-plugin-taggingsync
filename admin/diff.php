@@ -222,7 +222,7 @@ class admin_plugin_taggingsync_diff extends DokuWiki_Admin_Plugin
     protected function printTagCell($pid)
     {
         // FIXME: implement tag editing!
-        echo '<td>';
+        echo '<td class="taggingsync_tags" data-page="' . hsc($pid) . '">';
         if (!empty($this->primaryPages[$pid])) {
             echo hsc(implode(', ', $this->primaryPages[$pid]['tags']));
         }
