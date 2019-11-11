@@ -90,7 +90,23 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
             $this->transferSinglePage($pid, $clientDataDir, $INPUT->str('summary'));
         }
 
+        if ($this->getConf('sync_database')) {
+            $this->transferTaggingDatabase();
+        }
+
         msg($this->getLang('msg: transfer done'), 1);
+    }
+
+    /**
+     * Transfer the complete tagging database (overwrites the target)
+     */
+    protected function transferTaggingDatabase()
+    {
+        global $conf;
+        $filename = "tagging.sqlite3";
+        $source = fullpath($conf['metadir']) . "/" . $filename;
+        $dest = trim($this->getConf('client_wiki_directory')) . "/meta/$filename";
+        copy($source, $dest);
     }
 
     /**
