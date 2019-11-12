@@ -73,6 +73,8 @@ class helper_plugin_taggingsync extends DokuWiki_Plugin
                 return "$client/meta/$file.changes";
             case 'mediachangelog':
                 return "$client/media_meta/$file.changes";
+            case 'header':
+                return "$client/header/$file.txt";
             default:
                 throw new \RuntimeException('Unknown type given');
 
