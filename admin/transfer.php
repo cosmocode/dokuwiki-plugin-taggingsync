@@ -145,7 +145,7 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
 
             $changelogSummary = $this->getLang('changelog prefix') . $summary;
             $changelog = $this->now . "\t0.0.0.0\tE\t$pid\t \t$changelogSummary\t \n";
-            file_put_contents($changelogPathClient, $changelog);
+            file_put_contents($changelogPathClient, $changelog, FILE_APPEND);
 
             $this->writeLogLine($pid, $clientDataDir, $summary, $this->getLang('log: page'));
         }
