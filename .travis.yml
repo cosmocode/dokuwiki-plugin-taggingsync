@@ -2,6 +2,8 @@
 
 language: php
 php:
+  - "nightly"
+  - "7.3"
   - "7.2"
   - "7.1"
   - "7.0"
@@ -9,6 +11,8 @@ php:
 env:
   - DOKUWIKI=master
   - DOKUWIKI=stable
+allow_failures:
+  - php: "nightly"
 before_install: wget https://raw.github.com/splitbrain/dokuwiki-travis/master/travis.sh
 install: sh travis.sh
-script: cd _test && phpunit --stderr --group plugin_taggingsync
+script: cd _test && ./phpunit.phar --stderr --group plugin_taggingsync
