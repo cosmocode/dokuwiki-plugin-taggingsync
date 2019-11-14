@@ -149,11 +149,11 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         $metaPathClient = $this->hlp->clientFileForID($pid, 'meta');
         $changelogPathClient = $this->hlp->clientFileForID($pid, 'changelog');
 
-        $deleting = is_file(wikiFN($pid)) ? false : true;
+        $change = is_file(wikiFN($pid)) ? DOKU_CHANGE_TYPE_EDIT : DOKU_CHANGE_TYPE_DELETE;
 
         // copy page if it differs or delete if it does not exist in primary wiki
         if (!$this->hlp->filesEqual(wikiFN($pid), $pagePathClient)) {
-            if ($deleting) {
+            if ($change === DOKU_CHANGE_TYPE_DELETE) {
                 unlink($pagePathClient);
             } else {
                 io_makeFileDir($pagePathClient);
@@ -166,13 +166,13 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
             copy(metaFN($pid, '.meta'), $metaPathClient);
 
             $changelogSummary = $this->getLang('changelog prefix') . $summary;
-            $changelog = $this->now . "\t0.0.0.0\tE\t$pid\t \t$changelogSummary\t \n";
+            $changelog = $this->now . "\t0.0.0.0\t$change\t$pid\t \t$changelogSummary\t \n";
             file_put_contents($changelogPathClient, $changelog);
 
             $this->writeLogLine($pid, $clientDataDir, $summary, $this->getLang('log: page'));
         }
 
-        if ($deleting) return;
+        if ($change === DOKU_CHANGE_TYPE_DELETE) return;
 
         // check media file dependencies
         $pageMeta = p_get_metadata($pid, 'relation');
