@@ -147,6 +147,8 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
             $changelog = $this->now . "\t0.0.0.0\tE\t$pid\t \t$changelogSummary\t \n";
             file_put_contents($changelogPathClient, $changelog, FILE_APPEND);
 
+            $this->transferRevision($pid);
+
             $this->writeLogLine($pid, $clientDataDir, $summary, $this->getLang('log: page'));
         }
 
@@ -189,6 +191,17 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
 
             $this->writeLogLine($mediaID, $clientDataDir, $summary, $this->getLang('log: media'));
         }
+    }
+
+    /**
+     * Save a copy of the page being transferred as a current revision in attic
+     *
+     * @param string $pid
+     */
+    protected function transferRevision($pid)
+    {
+        $file = $this->hlp->clientFileForID($pid, 'revision', $this->now);
+        io_writeWikiPage($file, rawWiki($pid), $pid, $this->now);
     }
 
     /**
