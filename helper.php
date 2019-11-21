@@ -55,9 +55,10 @@ class helper_plugin_taggingsync extends DokuWiki_Plugin
      *
      * @param string $id the ID to access
      * @param string $type can be 'page', 'media', 'meta', 'changelog', 'mediachangelog'
+     * @param string $date
      * @return string
      */
-    public function clientFileForID($id, $type = 'page')
+    public function clientFileForID($id, $type = 'page', $date = '')
     {
         $file = utf8_encodeFN(str_replace(':', '/', $id));
         $client = trim($this->getConf('client_wiki_directory'));
@@ -75,6 +76,8 @@ class helper_plugin_taggingsync extends DokuWiki_Plugin
                 return "$client/media_meta/$file.changes";
             case 'header':
                 return "$client/header/$file.txt";
+            case 'revision':
+                return "$client/attic/$file.$date.txt.gz";
             default:
                 throw new \RuntimeException('Unknown type given');
 
