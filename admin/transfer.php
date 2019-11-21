@@ -138,7 +138,8 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         if (!$this->hlp->filesEqual(wikiFN($pid), $pagePathClient)) {
             io_makeFileDir($pagePathClient);
             copy(wikiFN($pid), $pagePathClient);
-            touch(wikiFN($pid), $this->now);
+            $modTime = filemtime(wikiFN($pid));
+            touch($pagePathClient, $modTime);
 
             io_makeFileDir($metaPathClient);
             copy(metaFN($pid, '.meta'), $metaPathClient);
