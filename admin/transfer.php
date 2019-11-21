@@ -18,6 +18,10 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
 
 
     protected $taggedPages;
+    /**
+     * @var array
+     */
+    protected $deletedPages = [];
     protected $transferedMedia;
     protected $now;
 
@@ -72,6 +76,7 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         if ($INPUT->has('tag')) {
             $tag = substr($INPUT->str('tag'), 1); // remove leading underscore
             $this->collectPages($tag);
+            $this->collectDeletions();
         }
         if ($INPUT->bool('execute_transfer') && checkSecurityToken()) {
             $this->transferCollectedPages();
@@ -79,13 +84,21 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
     }
 
     /**
-     * Transfer the collected pages to the client wiki
+     * Transfer the collected pages and optionally page deletions to the client wiki
      */
     protected function transferCollectedPages()
     {
         global $INPUT;
         $this->now = time();
         $clientDataDir = $this->getConf('client_wiki_directory');
+
+        // sync deletions first because the process checks for the latest sync, which is not supposed to be now
+        if ($INPUT->bool('sync_delete') && $this->deletedPages) {
+            foreach ($this->deletedPages as $page) {
+                $this->transferSinglePage($page['id'], $clientDataDir, 'Sync delete');
+            }
+        }
+
         foreach (array_keys($this->taggedPages) as $pid) {
             $this->transferSinglePage($pid, $clientDataDir, $INPUT->str('summary'));
         }
@@ -94,7 +107,7 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
     }
 
     /**
-     * Creates a list of files that are tagged witht he current tag and differ from the client wiki
+     * Creates a list of files that are tagged with he current tag and differ from the client wiki
      *
      * @return array
      */
@@ -107,10 +120,12 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
                 $transfer['p' . $pid] = ['id' => $pid, 'type' => 'page'];
             }
 
-            $pageMedia = p_get_metadata($pid, 'relation')['media'];
-            if (null === $pageMedia) continue;
+            $pageMeta = p_get_metadata($pid, 'relation');
+            if (!isset($pageMeta['media']) || !is_array($pageMeta['media'])) {
+                continue;
+            }
 
-            foreach (array_keys($pageMedia) as $mid) {
+            foreach (array_keys($pageMeta['media']) as $mid) {
                 if (!$this->hlp->filesEqual(mediaFN($pid), $this->hlp->clientFileForID($pid, 'media'))) {
                     $transfer['p' . $mid] = ['id' => $mid, 'type' => 'media'];
                 }
@@ -134,27 +149,35 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         $metaPathClient = $this->hlp->clientFileForID($pid, 'meta');
         $changelogPathClient = $this->hlp->clientFileForID($pid, 'changelog');
 
-        // copy page if it differs
+        $change = is_file(wikiFN($pid)) ? DOKU_CHANGE_TYPE_EDIT : DOKU_CHANGE_TYPE_DELETE;
+
+        // copy page if it differs or delete if it does not exist in primary wiki
         if (!$this->hlp->filesEqual(wikiFN($pid), $pagePathClient)) {
-            io_makeFileDir($pagePathClient);
-            copy(wikiFN($pid), $pagePathClient);
-            $modTime = filemtime(wikiFN($pid));
-            touch($pagePathClient, $modTime);
+            if ($change === DOKU_CHANGE_TYPE_DELETE) {
+                unlink($pagePathClient);
+            } else {
+                io_makeFileDir($pagePathClient);
+                copy(wikiFN($pid), $pagePathClient);
+                $modTime = filemtime(wikiFN($pid));
+                touch($pagePathClient, $modTime);
+            }
 
             io_makeFileDir($metaPathClient);
             copy(metaFN($pid, '.meta'), $metaPathClient);
 
             $changelogSummary = $this->getLang('changelog prefix') . $summary;
-            $changelog = $this->now . "\t0.0.0.0\tE\t$pid\t \t$changelogSummary\t \n";
+            $changelog = $this->now . "\t0.0.0.0\t$change\t$pid\t \t$changelogSummary\t \n";
             file_put_contents($changelogPathClient, $changelog, FILE_APPEND);
 
             $this->writeLogLine($pid, $clientDataDir, $summary, $this->getLang('log: page'));
         }
 
+        if ($change === DOKU_CHANGE_TYPE_DELETE) return;
+
         // check media file dependencies
-        $pageMedia = p_get_metadata($pid, 'relation')['media'];
-        if (null !== $pageMedia) {
-            $this->transferMedia(array_keys($pageMedia), $clientDataDir, $summary);
+        $pageMeta = p_get_metadata($pid, 'relation');
+        if (is_array($pageMeta) && isset($pageMeta['media'])) {
+            $this->transferMedia(array_keys($pageMeta['media']), $clientDataDir, $summary);
         }
     }
 
@@ -251,6 +274,22 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         $this->taggedPages = $tagging->findItems(['tag' => $tag], 'pid');
     }
 
+    /**
+     * Find page deletions since the latest sync using the global changelog.
+     */
+    protected function collectDeletions()
+    {
+        $clientDataDir = $this->getConf('client_wiki_directory');
+        $since = $this->getTimeOfLastTransfer($clientDataDir);
+        $changes = getRecentsSince($since);
+
+        if ($changes) {
+            $this->deletedPages = array_filter($changes, function ($change) {
+                return $change['type'] === DOKU_CHANGE_TYPE_DELETE;
+            });
+        }
+    }
+
     /** @inheritdoc */
     public function html()
     {
@@ -276,12 +315,16 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
      */
     protected function showTransferForm($tag)
     {
-        // prepare list
+        // prepare lists
+        $listDeleted = '';
         $preview = $this->previewTransferList();
         $count = count($preview);
         if ($count) {
             $list = '<ul>';
             foreach ($preview as $item) {
+                if (!page_exists($item['id'])) {
+                    continue;
+                }
                 if ($item['type'] === 'page') {
                     $list .= '<li>' . html_wikilink($item['id']) . '</li>';
                 } else {
@@ -289,6 +332,15 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
                 }
             }
             $list .= '</ul>';
+
+            if (count($this->deletedPages)) {
+                $listDeleted = '<p>' . $this->getLang('label: recently deleted') . '</p>';
+                $listDeleted .= '<ul>';
+                foreach ($this->deletedPages as $item) {
+                    $listDeleted .= '<li>' . $item['id'] . '</li>';
+                }
+                $listDeleted .= '</ul>';
+            }
         } else {
             $list = '<p>' . $this->getLang('label: no file') . '</p>';
         }
@@ -304,6 +356,10 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         $form->addHTML($list);
 
         if ($count) {
+            $form->addHTML($listDeleted);
+            $form->addCheckbox('sync_delete', $this->getLang('label: sync delete'));
+            $form->addHTML('<br>');
+
             $form->addTextInput('summary', $this->getLang('label: summary'))->attr('required', '1');
             $form->addButton('execute_transfer', 'Transfer files now');
         }
@@ -335,5 +391,25 @@ class admin_plugin_taggingsync_transfer extends DokuWiki_Admin_Plugin
         $form->addDropdown('tag', $options, $this->getLang('label: choose tag'));
 
         echo $form->toHTML();
+    }
+
+    /**
+     * Returns the timestamp of last logged sync or 0 if no logs are found
+     *
+     * @param $clientDataDir
+     * @return int
+     */
+    protected function getTimeOfLastTransfer($clientDataDir)
+    {
+        $since = 0;
+        $logDir = $clientDataDir . '/pages/' . str_replace(':', '/', $this->getConf('client_log_namespace'));
+        if (is_dir($logDir)) {
+            $files = scandir($logDir, SCANDIR_SORT_DESCENDING);
+            $files = array_diff($files, ['.', '..']);
+            if (isset($files[0])) {
+                $since = strtok($files[0], '.');
+            }
+        }
+        return $since;
     }
 }
