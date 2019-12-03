@@ -96,8 +96,8 @@ class helper_plugin_taggingsync extends DokuWiki_Plugin
         $md5_1 = '';
         $md5_2 = '';
 
-        if (file_exists($one)) $md5_1 = md5(file_get_contents($one));
-        if (file_exists($two)) $md5_2 = md5(file_get_contents($two));
+        if (file_exists($one) && is_file($one)) $md5_1 = md5(file_get_contents($one));
+        if (file_exists($two) && is_file($two)) $md5_2 = md5(file_get_contents($two));
 
         return $md5_1 === $md5_2;
     }
